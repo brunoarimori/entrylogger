@@ -1,60 +1,53 @@
-use std::fs::{File, OpenOptions};
+use std::fs::{OpenOptions, rename};
 use std::io::prelude::*;
-use std::path::Path;
 
 use regex::Regex;
 
 use application::*;
 use domain::*;
 
+static FILENAME: &'static str = "entries";
+
 pub struct FileSystemPersistence {}
 
 impl EntryPersistenceInterface for FileSystemPersistence {
   fn read_entries(&self) -> Result<Vec<EntryObject>, String> {
-    let path = Path::new("file.txt");
-    let display = path.display();
-    let mut file = match File::open(&path) {
-      Err(err) => {
-        println!("{:?} file opening error {:?}", display, err);
-        return Err("couldn't open file".to_string());
-      }
-      Ok(file) => file,
-    };
-
-    let mut content = String::new();
-    match file.read_to_string(&mut content) {
-      Err(err) => panic!("couldn't read {}: {}", display, err),
-      Ok(_) => print!("{} contains:\n{}", display, content),
-    };
-    return Err("not implemented".to_string());
-  }
-  fn write_entry(&self, entry: EntryObject) -> Result<EntryObject, String> {
-    // read all entries
-    // insert entry
-    // sort entries
-    // backup file
-    // write file
-    // delete backup
-    // if any errors, delete file and restore backup
-
-    let file = OpenOptions::new()
+    let mut res: Vec<EntryObject> = vec![];
+    // let display = path.display();
+    // let mut file = File::open(&path).unwrap();
+    let mut file = OpenOptions::new()
       .write(true)
-      .append(true)
-      .open("file.txt")
+      .read(true)
+      .create(true)
+      .open(FILENAME)
       .unwrap();
-    let entry_string = self.serialize_entry(entry.clone())? + "\n";
-    let mut writer = std::io::LineWriter::new(file);
-    writer.write(entry_string.as_bytes()).unwrap();
-    return Ok(entry);
-
-    /*
-    match writeln!() {
-      Err(why) => panic!("couldn't write {}", why),
-      Ok(_) => {
-        print!("ok")
+    let mut content = String::new();
+    file.read_to_string(&mut content).unwrap();
+    let string_vec: Vec<&str> = content.split("\n").collect();
+    for split_string in string_vec {
+      if split_string.len() > 0 {
+        let obj = self.parse_string(split_string.to_string()).unwrap();
+        res.push(obj);
       }
     }
-    */
+    return Ok(res);
+  }
+  fn write_entry(&self, entry: EntryObject) -> Result<EntryObject, String> {
+    let mut entries = self.read_entries()?;
+    entries.push(entry.clone());
+    entries.sort();
+    rename(FILENAME, FILENAME.to_string() + ".bak").unwrap();
+    let file = OpenOptions::new()
+      .create(true)
+      .append(true)
+      .open(FILENAME)
+      .unwrap();
+    let mut writer = std::io::LineWriter::new(file);
+    for item in entries {
+      let entry_string = self.serialize_entry(item.clone())? + "\n";
+      writer.write(entry_string.as_bytes()).unwrap();
+    }
+    return Ok(entry);
   }
 }
 
@@ -70,12 +63,11 @@ impl EntryStringConverter for FileSystemPersistence {
     };
     let match_metadata = REGEX.is_match(entry_string.as_str());
     if !match_metadata {
-      return Err("Couldn't parse string to Entry".to_string());
+      return Err("Couldn't parse string to Entry: ".to_string() + entry_string.as_str());
     }
     let metadata_string = REGEX.captures(entry_string.as_str()).unwrap().get(1).unwrap().as_str();
     let metadata_split: Vec<&str> = metadata_string.split(' ').collect();
     let message = REGEX.split(entry_string.as_str()).collect::<Vec<&str>>()[1].trim_start();
-    println!("string {:?}", message);
     let mut metadata = EntryMetadata {
       ins: None,
       date: "".to_string(),
@@ -92,7 +84,6 @@ impl EntryStringConverter for FileSystemPersistence {
         _=> return Err("Invalid value detected in metadata".to_string()),
       }
     }
-    println!("{:?}", metadata);
     let result = EntryObject {
       metadata,
       message: message.to_string(),
@@ -114,7 +105,6 @@ mod tests {
     let string = "[ins:0000000000000 date:13-oct-20 time:morning tag:fit] aerobic (5/5)".to_string();
     let persistence = FileSystemPersistence {};
     let object = persistence.parse_string(string).unwrap();
-    println!("{:?}", object);
     let compare_metadata = EntryMetadata {
       ins: Some("0000000000000".to_string()),
       date: "13-oct-20".to_string(),

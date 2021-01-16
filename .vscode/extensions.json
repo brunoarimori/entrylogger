@@ -1,6 +1,5 @@
 {
   "recommendations": [
-    "swellaby.rust-pack",
     "matklad.rust-analyzer"
   ]
 }

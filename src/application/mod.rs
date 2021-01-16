@@ -14,6 +14,7 @@ pub trait EntryControllerInterface {
   ) -> Self;
   fn get_entries(&self) -> Result<Vec<domain::EntryObject>, String>;
   fn post_entry(&self, entry: domain::EntryObject) -> Result<domain::EntryObject, String>;
+  // fn digest(&self) -> Result<>;
 }
 
 pub struct EntryController {
@@ -38,11 +39,8 @@ impl EntryControllerInterface for EntryController {
   }
   fn post_entry(&self, mut entry: domain::EntryObject) -> Result<domain::EntryObject, String> {
     let ins = chrono::Local::now().timestamp_millis().to_string();
-    println!("...{:?}", ins);
     entry.metadata.ins = Some(ins);
     self.entry_business.validate(&entry)?;
     return self.entry_persistence.write_entry(entry);
   }
 }
-
-/* -----------------------------------TESTS------------------------------------------ */
