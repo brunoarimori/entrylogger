@@ -6,20 +6,17 @@ pub mod fs;
 use application::*;
 use domain::*;
 
-pub fn test() {
-  // let test_persistence = cli::TestFileSystemPersistence {};
-  let test_persistence = fs::FileSystemPersistence {};
+pub fn start_entrylogger_cli_fs() {
+  let persistence = fs::FileSystemPersistence {};
   let business = EntryBusiness {};
-  let test = EntryController::new(Rc::new(business), Rc::new(test_persistence));
-  // let entries = test.get_entries().unwrap();
-  // println!("{:?}", entries.len());
-  let cli_input = cli::CliInput::new(test);
+  let controller = EntryController::new(Rc::new(business), Rc::new(persistence));
+  let cli_input = cli::CliInput::new(controller);
   match cli_input.listen() {
-    Ok(value) => {
-      println!("{:?}", value);
+    Ok(_val) => {
+      println!("Message written.");
     }
-    Err(error) => {
-      println!("Error while reading entry: {:?}", error);
+    Err(err) => {
+      println!("Error: {}", err);
     }
   }
 }
