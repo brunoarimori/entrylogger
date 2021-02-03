@@ -4,7 +4,7 @@ use std::clone::Clone;
 use std::cmp::Ordering;
 use std::fmt::Debug;
 
-static TIME_VEC: &'static [&str] = &["morning", "afternoon", "night", "latenight", "n/a"];
+static TIME_VEC: &'static [&str] = &["latenight", "morning", "afternoon", "night", "n/a"];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EntryMetadata {
@@ -22,39 +22,32 @@ pub struct EntryObject {
 impl Ord for EntryMetadata {
   // compare date -> time -> ins -> tag
   fn cmp(&self, other: &Self) -> Ordering {
-    if self.date == other.date {
-      if self.time == other.time {
-        if self.ins.is_none() {
-          return Ordering::Greater;
-        }
-        if other.ins.is_none() {
-          return Ordering::Less;
-        }
-        if self.ins == other.ins {
-          if self.tag == other.tag {
-            return Ordering::Equal;
-          } else {
-            return self.tag.cmp(&other.tag);
-          }
-        } else {
-          let ins_self = self.ins.as_ref().unwrap().parse::<i64>().unwrap();
-          let ins_other = other.ins.as_ref().unwrap().parse::<i64>().unwrap();
-          return ins_self.cmp(&ins_other);
-        }
-      } else {
-        let self_time_index = TIME_VEC
-          .iter()
-          .position(|&time_str| -> bool { time_str == self.time });
-        let other_time_index = TIME_VEC
-          .iter()
-          .position(|&time_str| -> bool { time_str == other.time });
-        return self_time_index.cmp(&other_time_index);
-      }
-    } else {
+    if self.date != other.date {
       let dt_self = NaiveDate::parse_from_str(self.date.as_str(), "%d-%b-%y").unwrap();
       let dt_other = NaiveDate::parse_from_str(other.date.as_str(), "%d-%b-%y").unwrap();
       return dt_self.cmp(&dt_other);
     }
+    if self.time != other.time {
+      let self_time_index = TIME_VEC
+        .iter()
+        .position(|&time_str| -> bool { time_str == self.time });
+      let other_time_index = TIME_VEC
+        .iter()
+        .position(|&time_str| -> bool { time_str == other.time });
+      return self_time_index.cmp(&other_time_index);
+    }
+    if self.ins.is_none() {
+      return Ordering::Greater;
+    }
+    if other.ins.is_none() {
+      return Ordering::Less;
+    }
+    if self.ins != other.ins {
+      let ins_self = self.ins.as_ref().unwrap().parse::<i64>().unwrap();
+      let ins_other = other.ins.as_ref().unwrap().parse::<i64>().unwrap();
+      return ins_self.cmp(&ins_other);
+    }
+    return self.tag.cmp(&other.tag);
   }
 }
 impl PartialOrd for EntryMetadata {
@@ -167,12 +160,31 @@ impl EntryHandler for EntryBusiness {
 }
 
 /* -----------------------------------TESTS------------------------------------------ */
+/*
+# Domain
+## EntryObject validation
+### metadata
+- four properties allowed in metadata:
+  - ins: (13 characters) epoch format, date of insertion
+  - date: (9 characters) dd-mon-yy format, date of occurence
+  - time: (9 characters max) fixed values:
+    - latenight: 00-05
+    - morning: 06-11
+    - afternoon: 12-17
+    - night: 18-23
+    - no: not applicable
+  - tag: (12 characters max) alphanumerical only, entry subject, only one per entry
+### message
+- 32 characters max, characters allowed: alphanumerical, + - = . , : _ \ / ( ) < > $"
+## EntryObject sorting
+*/
 #[cfg(test)]
 mod tests {
   use super::*;
   // use chrono::prelude::*;
   use std::convert::TryInto;
 
+  /* VALIDATION */
   #[test]
   fn validate_tag_test() {
     let entry_validator = EntryBusiness {};
@@ -214,7 +226,6 @@ mod tests {
     let entry_validator = EntryBusiness {};
     let wrong_length = entry_validator.validate_ins("111111111111");
     let wrong_format = entry_validator.validate_ins("111111111111a");
-    println!("{:?}", wrong_format);
     assert_eq!(wrong_length.is_err(), true);
     assert_eq!(wrong_format.is_err(), true);
     let allowed = entry_validator.validate_ins("1111111111111");
@@ -232,7 +243,7 @@ mod tests {
     let allowed2 = entry_validator.validate_message("d");
     assert_eq!(allowed2.is_ok(), true);
   }
-
+  /* SORTING */
   #[test]
   fn sort_entry_test() {
     // sort by date -> time -> ins
@@ -286,9 +297,9 @@ mod tests {
 
     /* TIME */
 
-    let time1 = "morning".to_string();
-    let time2 = "afternoon".to_string();
-    let time3 = "latenight".to_string();
+    let time1 = "latenight".to_string();
+    let time2 = "morning".to_string();
+    let time3 = "night".to_string();
     let time4 = "n/a".to_string();
     let time_vec_ordered = vec![time1.clone(), time2.clone(), time3.clone(), time4.clone()];
     let time_vec_unordered = vec![time2.clone(), time1.clone(), time3.clone(), time4.clone()];
