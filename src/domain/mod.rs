@@ -1,10 +1,17 @@
 use chrono::prelude::*;
 use regex::Regex;
-use std::clone::Clone;
+use std::{clone::Clone, usize};
 use std::cmp::Ordering;
 use std::fmt::Debug;
 
 static TIME_VEC: &'static [&str] = &["latenight", "morning", "afternoon", "night", "n/a"];
+const INS_LENGTH: usize = 13;
+const MAX_TAG_LENGTH: usize = 12;
+const MAX_MSG_LENGTH: usize = 32;
+lazy_static! {
+  static ref ALPHA_REGEX: Regex = Regex::new(r"^[a-z0-9]+$").unwrap();
+  static ref MSG_REGEX: Regex = Regex::new(r"^[A-z \+-=.,:_\\/\(\)<> \$]+$").unwrap();
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EntryMetadata {
@@ -20,7 +27,6 @@ pub struct EntryObject {
 }
 
 impl Ord for EntryMetadata {
-  // compare date -> time -> ins -> tag
   fn cmp(&self, other: &Self) -> Ordering {
     if self.date != other.date {
       let dt_self = NaiveDate::parse_from_str(self.date.as_str(), "%d-%b-%y").unwrap();
@@ -85,15 +91,11 @@ pub trait EntryHandler: EntryValidator {
 pub struct EntryBusiness {}
 impl EntryValidator for EntryBusiness {
   fn validate_tag(&self, tag: &str) -> Result<String, String> {
-    lazy_static! {
-      static ref REGEX: Regex = Regex::new(r"^[a-z0-9]+$").unwrap();
-    };
-    let max_length = 12;
-    if !REGEX.is_match(tag) {
+    if !ALPHA_REGEX.is_match(tag) {
       return Err("Only lowercase alphanumerical characters allowed in tag".to_string());
     };
-    if tag.len() > max_length {
-      return Err("Maximum length allowed for tag: ".to_string() + &max_length.to_string());
+    if tag.len() > MAX_TAG_LENGTH {
+      return Err("Maximum length allowed for tag: ".to_string() + &MAX_TAG_LENGTH.to_string());
     };
     return Ok(tag.to_string());
   }
@@ -108,19 +110,17 @@ impl EntryValidator for EntryBusiness {
     };
   }
   fn validate_time(&self, time: &str) -> Result<String, String> {
-    match time {
-      "morning" | "afternoon" | "night" | "latenight" | "n/a" => return Ok(time.to_string()),
-      _ => {
+    if TIME_VEC.contains(&time) {
+      return Ok(time.to_string());
+    } else {
         return Err(
           "Expected one of the following: morning, afternoon, night, latenight, n/a or now"
             .to_string(),
         )
-      }
     }
   }
   fn validate_ins(&self, ins: &str) -> Result<String, String> {
-    let length = 13;
-    if ins.len() != length {
+    if ins.len() != INS_LENGTH {
       return Err("Wrong length for ins".to_string());
     }
     let check = ins.parse::<u64>();
@@ -130,15 +130,11 @@ impl EntryValidator for EntryBusiness {
     };
   }
   fn validate_message(&self, message: &str) -> Result<String, String> {
-    lazy_static! {
-      static ref REGEX: Regex = Regex::new(r"^[A-z \+-=.,:_\\/\(\)<> \$]+$").unwrap();
-    };
-    let max_length = 32;
-    if !REGEX.is_match(message) {
+    if !MSG_REGEX.is_match(message) {
       return Err("Invalid characters found in message".to_string());
     };
-    if message.len() > max_length {
-      return Err("Maximum length allowed for message: ".to_string() + &max_length.to_string());
+    if message.len() > MAX_MSG_LENGTH {
+      return Err("Maximum length allowed for message: ".to_string() + &MAX_MSG_LENGTH.to_string());
     };
     return Ok(message.to_string());
   }
@@ -177,6 +173,7 @@ impl EntryHandler for EntryBusiness {
 ### message
 - 32 characters max, characters allowed: alphanumerical, + - = . , : _ \ / ( ) < > $"
 ## EntryObject sorting
+- date -> time -> ins -> tag -> message
 */
 #[cfg(test)]
 mod tests {
