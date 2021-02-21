@@ -40,7 +40,9 @@ impl EntryControllerInterface for EntryController {
   fn post_entry(&self, mut entry: domain::EntryObject) -> Result<domain::EntryObject, String> {
     let ins = chrono::Local::now().timestamp_millis().to_string();
     entry.metadata.ins = Some(ins);
-    self.entry_business.validate(&entry);
+    let _validate = self.entry_business.validate(&entry).or_else(|err| {
+      return Err(err.message());
+    });
     return self.entry_persistence.write_entry(entry);
   }
 }
