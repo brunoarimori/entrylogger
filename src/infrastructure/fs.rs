@@ -1,4 +1,4 @@
-use std::fs::{OpenOptions, rename};
+use std::{fs::{OpenOptions, rename}, path::Path};
 use std::io::prelude::*;
 
 use regex::Regex;
@@ -6,20 +6,26 @@ use regex::Regex;
 use application::*;
 use domain::*;
 
-static FILENAME: &'static str = "entries";
-
-pub struct FileSystemPersistence {}
+pub struct FileSystemPersistence {
+  config: FileSystemConfiguration,
+}
 
 impl EntryPersistenceInterface for FileSystemPersistence {
   fn read_entries(&self) -> Result<Vec<EntryObject>, String> {
     let mut res: Vec<EntryObject> = vec![];
     // let display = path.display();
     // let mut file = File::open(&path).unwrap();
+    let path = format!(
+      "{}/{}{}",
+      self.config.file_path.to_owned(),
+      self.config.file_name.to_owned(),
+      self.config.file_current_extension.to_owned()
+    );
     let mut file = OpenOptions::new()
       .write(true)
       .read(true)
       .create(true)
-      .open(FILENAME)
+      .open(Path::new(path.as_str()))
       .unwrap();
     let mut content = String::new();
     file.read_to_string(&mut content).unwrap();
@@ -34,13 +40,27 @@ impl EntryPersistenceInterface for FileSystemPersistence {
   }
   fn write_entry(&self, entry: EntryObject) -> Result<EntryObject, String> {
     let mut entries = self.read_entries()?;
+    let current_path_string = format!(
+      "{}/{}{}",
+      self.config.file_path.to_owned(),
+      self.config.file_name.to_owned(),
+      self.config.file_current_extension.to_owned()
+    );
+    let backup_path_string = format!(
+      "{}/{}{}",
+      self.config.file_path.to_owned(),
+      self.config.file_name.to_owned(),
+      self.config.file_backup_extension.to_owned()
+    );
+    let current_path = Path::new(current_path_string.as_str());
+    let backup_path = Path::new(backup_path_string.as_str());
     entries.push(entry.clone());
     entries.sort();
-    rename(FILENAME, FILENAME.to_string() + ".bak").unwrap();
+    rename(current_path, backup_path).unwrap();
     let file = OpenOptions::new()
       .create(true)
       .append(true)
-      .open(FILENAME)
+      .open(current_path)
       .unwrap();
     let mut writer = std::io::LineWriter::new(file);
     for item in entries {
@@ -54,6 +74,17 @@ impl EntryPersistenceInterface for FileSystemPersistence {
 trait EntryStringConverter {
   fn parse_string(&self, entry_string: String) -> Result<EntryObject, String>;
   fn serialize_entry(&self, entry: EntryObject) -> Result<String, String>;
+}
+
+pub struct FileSystemConfiguration {
+  pub file_name: String,
+  pub file_path: String,
+  pub file_current_extension: String,
+  pub file_backup_extension: String,
+}
+
+pub trait FileSystemLoader {
+  fn load(config: FileSystemConfiguration) -> Self;
 }
 
 impl EntryStringConverter for FileSystemPersistence {
@@ -96,6 +127,14 @@ impl EntryStringConverter for FileSystemPersistence {
   }
 }
 
+impl FileSystemLoader for FileSystemPersistence {
+  fn load(config: FileSystemConfiguration) -> Self {
+    return FileSystemPersistence {
+      config,
+    }
+  }
+}
+
 /* -----------------------------------TESTS------------------------------------------ */
 #[cfg(test)]
 mod tests {
@@ -103,7 +142,13 @@ mod tests {
   #[test]
   fn parse_string_test() {
     let string = "[ins:0000000000000 date:13-oct-20 time:morning tag:fit] aerobic (5/5)".to_string();
-    let persistence = FileSystemPersistence {};
+    let config = FileSystemConfiguration {
+      file_name: "hello".to_owned(),
+      file_path: "./".to_owned(),
+      file_current_extension: ".ok".to_owned(),
+      file_backup_extension: ".bak".to_owned(),
+    };
+    let persistence: FileSystemPersistence = FileSystemLoader::load(config);
     let object = persistence.parse_string(string).unwrap();
     let compare_metadata = EntryMetadata {
       ins: Some("0000000000000".to_string()),
@@ -119,7 +164,13 @@ mod tests {
   }
   #[test]
   fn serialize_entry() {
-    let persistence = FileSystemPersistence {};
+    let config = FileSystemConfiguration {
+      file_name: "test".to_owned(),
+      file_path: "test".to_owned(),
+      file_current_extension: "".to_owned(),
+      file_backup_extension: "".to_owned(),
+    };
+    let persistence: FileSystemPersistence = FileSystemLoader::load(config);
     let input_metadata = EntryMetadata {
       ins: Some("0000000000000".to_string()),
       date: "13-oct-20".to_string(),
