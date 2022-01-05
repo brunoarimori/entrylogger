@@ -4,3 +4,4 @@ notes
 *.bak
 *.log
 entries
+*.autosave
