@@ -1,190 +1,10 @@
-use chrono::prelude::*;
-use regex::Regex;
-use std::{clone::Clone, usize};
-use std::cmp::Ordering;
-use std::fmt::Debug;
-// use self::DomainError;
+mod error;
+mod entry_object;
+mod entry_business;
 
-static TIME_VEC: &'static [&str] = &["latenight", "morning", "afternoon", "night", "n/a"];
-const INS_LENGTH: usize = 13;
-const MAX_TAG_LENGTH: usize = 12;
-const MAX_MSG_LENGTH: usize = 32;
-lazy_static! {
-  static ref ALPHA_REGEX: Regex = Regex::new(r"^[a-z0-9]+$").unwrap();
-  static ref MSG_REGEX: Regex = Regex::new(r"^[A-z \+-=.,:_\\/\(\)<> \$]+$").unwrap();
-}
-// const TAG_VALIDATION_ERROR: &str = "error";
-
-#[derive(Clone)]
-pub enum DomainErrorCode {
-  InvalidFormat,
-  MaxLengthExceeded,
-  MissingIns,
-}
-
-pub struct DomainError {
-  code: DomainErrorCode,
-  message: String,
-}
-
-impl DomainError {
-  pub fn new(code: DomainErrorCode, message: String) -> DomainError {
-    return DomainError {
-      code,
-      message,
-    }
-  }
-  pub fn code(&self) -> DomainErrorCode {
-    return self.code.to_owned();
-  }
-  pub fn message(&self) -> String {
-    return self.message.to_owned();
-  }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct EntryMetadata {
-  pub ins: Option<String>,
-  pub date: String,
-  pub time: String,
-  pub tag: String,
-}
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct EntryObject {
-  pub metadata: EntryMetadata,
-  pub message: String,
-}
-
-impl Ord for EntryMetadata {
-  fn cmp(&self, other: &Self) -> Ordering {
-    if self.date != other.date {
-      let dt_self = NaiveDate::parse_from_str(self.date.as_str(), "%d-%b-%y").unwrap();
-      let dt_other = NaiveDate::parse_from_str(other.date.as_str(), "%d-%b-%y").unwrap();
-      return dt_self.cmp(&dt_other);
-    }
-    if self.time != other.time {
-      let self_time_index = TIME_VEC
-        .iter()
-        .position(|&time_str| -> bool { time_str == self.time });
-      let other_time_index = TIME_VEC
-        .iter()
-        .position(|&time_str| -> bool { time_str == other.time });
-      return self_time_index.cmp(&other_time_index);
-    }
-    if self.ins.is_none() {
-      return Ordering::Greater;
-    }
-    if other.ins.is_none() {
-      return Ordering::Less;
-    }
-    if self.ins != other.ins {
-      let ins_self = self.ins.as_ref().unwrap().parse::<i64>().unwrap();
-      let ins_other = other.ins.as_ref().unwrap().parse::<i64>().unwrap();
-      return ins_self.cmp(&ins_other);
-    }
-    return self.tag.cmp(&other.tag);
-  }
-}
-impl PartialOrd for EntryMetadata {
-  fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-    return Some(self.cmp(other));
-  }
-}
-impl Ord for EntryObject {
-  fn cmp(&self, other: &Self) -> Ordering {
-    if self.metadata == other.metadata {
-      return self.message.cmp(&other.message);
-    } else {
-      return self.metadata.cmp(&other.metadata);
-    }
-  }
-}
-impl PartialOrd for EntryObject {
-  fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-    return Some(self.cmp(other));
-  }
-}
-
-pub trait EntryValidator {
-  fn validate_tag(&self, tag: &str) -> Result<String, DomainError>;
-  fn validate_date(&self, date: &str) -> Result<String, DomainError>;
-  fn validate_time(&self, time: &str) -> Result<String, DomainError>;
-  fn validate_ins(&self, ins: &str) -> Result<String, DomainError>;
-  fn validate_message(&self, message: &str) -> Result<String, DomainError>;
-}
-
-pub trait EntryHandler: EntryValidator {
-  fn validate(&self, entry: &EntryObject) -> Result<String, DomainError>;
-}
-
-pub struct EntryBusiness {}
-impl EntryValidator for EntryBusiness {
-  fn validate_tag(&self, tag: &str) -> Result<String, DomainError> {
-    if !ALPHA_REGEX.is_match(tag) {
-      // return Err("Only lowercase alphanumerical characters allowed in tag".to_string());
-      // return Err(DomainError::InvalidFormat);
-      return Err(DomainError::new(DomainErrorCode::InvalidFormat, "Only lowercase alphanumerical characters allowed in tag".to_string()));
-    };
-    if tag.len() > MAX_TAG_LENGTH {
-      // return Err("Maximum length allowed for tag: ".to_string() + &MAX_TAG_LENGTH.to_string());
-      // return Err(DomainError::MaxLengthExceeded);
-      return Err(DomainError::new(DomainErrorCode::MaxLengthExceeded, "Maximum length for tag is ".to_string() + &MAX_TAG_LENGTH.to_string()));
-    };
-    return Ok(tag.to_string());
-  }
-  fn validate_date(&self, date: &str) -> Result<String, DomainError> {
-    match chrono::NaiveDate::parse_from_str(date, "%d-%b-%y") {
-      Ok(value) => return Ok(value.format("%d-%b-%y").to_string().to_lowercase()),
-      Err(_err) => {
-        // return Err("Expected one of the following: today, yesterday or <dd-mon-yy> format".to_string());
-        // return Err(DomainError::InvalidFormat)
-        return Err(DomainError::new(DomainErrorCode::InvalidFormat, "Expected <dd-mon-yy>".to_string()));
-      }
-    };
-  }
-  fn validate_time(&self, time: &str) -> Result<String, DomainError> {
-    if TIME_VEC.contains(&time) {
-      return Ok(time.to_string());
-    } else {
-      // return Err("Expected one of the following: morning, afternoon, night, latenight, n/a or now".to_string());
-      return Err(DomainError::new(DomainErrorCode::InvalidFormat, "Expected one of the following: morning, afternoon, night, latenight, n/a".to_string()));
-    }
-  }
-  fn validate_ins(&self, ins: &str) -> Result<String, DomainError> {
-    if ins.len() != INS_LENGTH {
-      return Err(DomainError::new(DomainErrorCode::MaxLengthExceeded, "Maximum length for ins is ".to_string() + &INS_LENGTH.to_string()));
-    }
-    let check = ins.parse::<u64>();
-    match check {
-      Ok(_ok) => return Ok(ins.to_string()),
-      Err(_err) => return Err(DomainError::new(DomainErrorCode::InvalidFormat, "Ins must be a number".to_string())),
-    };
-  }
-  fn validate_message(&self, message: &str) -> Result<String, DomainError> {
-    if !MSG_REGEX.is_match(message) {
-      return Err(DomainError::new(DomainErrorCode::InvalidFormat, "Invalid characters found in message".to_string()));
-    };
-    if message.len() > MAX_MSG_LENGTH {
-      return Err(DomainError::new(DomainErrorCode::MaxLengthExceeded, "Maximum length for message is ".to_string() + &MAX_MSG_LENGTH.to_string()));
-    };
-    return Ok(message.to_string());
-  }
-}
-impl EntryHandler for EntryBusiness {
-  fn validate(&self, entry: &EntryObject) -> Result<String, DomainError> {
-    // check if ins exists in metadata
-    if entry.metadata.ins.is_none() {
-      return Err(DomainError::new(DomainErrorCode::MissingIns, "Missing ins".to_string()));
-    };
-    let ins = entry.metadata.ins.as_ref().unwrap();
-    self.validate_tag(entry.metadata.tag.as_str())?;
-    self.validate_date(entry.metadata.date.as_str())?;
-    self.validate_time(entry.metadata.time.as_str())?;
-    self.validate_ins(ins.as_str())?;
-    self.validate_message(entry.message.as_str())?;
-    return Ok("Entry validated: ".to_string() + ins.as_str());
-  }
-}
+pub use self::error::*;
+pub use self::entry_object::*;
+pub use self::entry_business::*;
 
 /* -----------------------------------TESTS------------------------------------------ */
 /*
@@ -206,10 +26,11 @@ impl EntryHandler for EntryBusiness {
 ## EntryObject sorting
 - date -> time -> ins -> tag -> message
 */
+
 #[cfg(test)]
 mod tests {
   use super::*;
-  // use chrono::prelude::*;
+  use chrono::prelude::*;
   use std::convert::TryInto;
 
   /* VALIDATION */
@@ -540,3 +361,4 @@ mod tests {
     assert_eq!(obj_vec_ordered, obj_vec_unordered);
   }
 }
+
