@@ -1,11 +1,10 @@
-// use std::rc::Rc;
 use std::io::prelude::*;
 
 use chrono::{prelude::*, Duration};
 use clap::{App, Arg};
 
-use domain::*;
 use application::*;
+use domain::*;
 
 struct InputParsing {}
 impl InputParsing {
@@ -127,32 +126,50 @@ impl CliInput {
       )
       .get_matches();
     if matches.is_present("post") {
-      let date = self.entry_business.validate_date(self.read_date().unwrap().as_str()).or_else(|err| {
-        match err.code() {
-          DomainErrorCode::InvalidFormat => return Err("Expected one of the following: today, yesterday or <dd-mon-yy> format"),
-          _ => return Err("Couldn't parse date.")
-        }
-      })?;
-      let time = self.entry_business.validate_time(self.read_time().unwrap().as_str()).or_else(|err| {
-        match err.code() {
-          DomainErrorCode::InvalidFormat => return Err("Expected one of the following: morning, afternoon, night, latenight, n/a or now"),
-          _ => return Err("Couldn't parse time.")
-        }
-      })?;
-      let tag = self.entry_business.validate_tag(self.read_tag().unwrap().as_str()).or_else(|err| {
-        match err.code() {
-          DomainErrorCode::InvalidFormat => return Err("Only lowercase alphanumerical characters allowed in tag"),
-          DomainErrorCode::MaxLengthExceeded => return Err("Maximum length allowed for tag: 12"), // TODO: better error handling
-          _ => return Err("Couldn't parse tag.")
-        }
-      })?;
-      let message = self.entry_business.validate_message(self.read_message().unwrap().as_str()).or_else(|err| {
-        match err.code() {
-          DomainErrorCode::InvalidFormat => return Err("Invalid characters found in message"),
-          DomainErrorCode::MaxLengthExceeded => return Err("Maximum length allowed for message: 32"), // TODO: better error handling
-          _ => return Err("Couldn't parse message.")
-        }
-      })?;
+      let date = self
+        .entry_business
+        .validate_date(self.read_date().unwrap().as_str())
+        .or_else(|err| match err.code() {
+          DomainErrorCode::InvalidFormat => {
+            return Err("Expected one of the following: today, yesterday or <dd-mon-yy> format")
+          }
+          _ => return Err("Couldn't parse date."),
+        })?;
+      let time = self
+        .entry_business
+        .validate_time(self.read_time().unwrap().as_str())
+        .or_else(|err| match err.code() {
+          DomainErrorCode::InvalidFormat => {
+            return Err(
+              "Expected one of the following: morning, afternoon, night, latenight, n/a or now",
+            )
+          }
+          _ => return Err("Couldn't parse time."),
+        })?;
+      let tag = self
+        .entry_business
+        .validate_tag(self.read_tag().unwrap().as_str())
+        .or_else(|err| {
+          match err.code() {
+            DomainErrorCode::InvalidFormat => {
+              return Err("Only lowercase alphanumerical characters allowed in tag")
+            }
+            DomainErrorCode::MaxLengthExceeded => return Err("Maximum length allowed for tag: 12"), // TODO: better error handling
+            _ => return Err("Couldn't parse tag."),
+          }
+        })?;
+      let message = self
+        .entry_business
+        .validate_message(self.read_message().unwrap().as_str())
+        .or_else(|err| {
+          match err.code() {
+            DomainErrorCode::InvalidFormat => return Err("Invalid characters found in message"),
+            DomainErrorCode::MaxLengthExceeded => {
+              return Err("Maximum length allowed for message: 32")
+            } // TODO: better error handling
+            _ => return Err("Couldn't parse message."),
+          }
+        })?;
       let entry_metadata = EntryMetadata {
         date,
         time,
