@@ -1,5 +1,5 @@
-use super::error::*;
 use super::entry_object::*;
+use super::error::*;
 
 use regex::Regex;
 
@@ -120,4 +120,3 @@ impl EntryHandler for EntryBusiness {
     return Ok("Entry validated: ".to_string() + ins.as_str());
   }
 }
-

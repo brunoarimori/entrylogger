@@ -1,10 +1,10 @@
-mod error;
-mod entry_object;
 mod entry_business;
+mod entry_object;
+mod error;
 
-pub use self::error::*;
-pub use self::entry_object::*;
 pub use self::entry_business::*;
+pub use self::entry_object::*;
+pub use self::error::*;
 
 /* -----------------------------------TESTS------------------------------------------ */
 /*
@@ -361,4 +361,3 @@ mod tests {
     assert_eq!(obj_vec_ordered, obj_vec_unordered);
   }
 }
-

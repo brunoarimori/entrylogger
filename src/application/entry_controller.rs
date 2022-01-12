@@ -1,7 +1,7 @@
-use std::rc::Rc;
 use super::entry_controller_interface::EntryControllerInterface;
 use super::entry_persistence_interface::EntryPersistenceInterface;
 use domain;
+use std::rc::Rc;
 
 pub struct EntryController {
   entry_business: Rc<dyn domain::EntryHandler>,
