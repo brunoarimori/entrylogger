@@ -1,7 +1,7 @@
 use chrono::prelude::*;
+use std::clone::Clone;
 use std::cmp::Ordering;
 use std::fmt::Debug;
-use std::clone::Clone;
 
 pub static TIME_VEC: &'static [&str] = &["latenight", "morning", "afternoon", "night", "n/a"];
 
