@@ -1,1 +1,7 @@
 target
+notes
+*.txt
+*.bak
+*.log
+entries
+*.autosave
